@@ -17,8 +17,7 @@
           "quickstart"
         ]
       },
-      "journal",
-      "mintlify-internal-docs-tdd"
+      "journal"
     ],
     "global": {
       "anchors": [
