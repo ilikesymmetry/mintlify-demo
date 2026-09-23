@@ -1,0 +1,64 @@
+---
+title: "TDD: Mintlify Internal Docs Product"
+sidebarTitle: "Internal Docs TDD"
+description: "Technical design doc for the Mintlify internal docs product: goals, scope, architecture, and rollout plan on one page."
+---
+
+Technical design doc for the Mintlify internal docs product: a private documentation surface for teams to run their wiki, runbooks, and onboarding alongside their public docs.
+
+## Context
+
+Teams already use Mintlify for public docs but keep internal knowledge scattered across Notion, Google Docs, and Slack. Internal Docs extends the existing editor and hosting stack to cover private, team-only content without a second tool.
+
+## Goals
+
+- Give teams a private space (Personal, Teamspace, Shared) that reuses the Mintlify editor, AI, and navigation.
+- Enforce per-page and per-folder access at read and write time.
+- Ship without forking the public docs pipeline: same MDX, same components, same publish flow.
+
+## Non-goals
+
+- Real-time multi-cursor editing (v1 is single-writer with autosave).
+- Rich office-suite features (spreadsheets, whiteboards, tasks).
+- External sharing to non-members via public links (v2).
+
+## Users
+
+- **IC**: writes runbooks, meeting notes, personal drafts.
+- **Team lead**: curates a Teamspace, sets access, promotes pages to public docs.
+- **Admin**: manages members, audit, and retention.
+
+## Architecture
+
+- **Storage**: private pages persisted as MDX in a per-org bucket, keyed by `private-page-<uuid>`; folders keyed by `private-folder-<uuid>`.
+- **Auth**: dashboard session gates the editor; page-level ACLs checked on every read/write via the existing permission service.
+- **Editor**: reuses the WYSIWYG editor. A `visibility` flag on the page record switches between public (git-backed) and private (bucket-backed) writes.
+- **Navigation**: private tree rendered from the ACL-scoped index, not from `docs.json`.
+- **Promotion**: `mv private -> workspace` copies content and media into the git repo and drops the private record.
+
+## API surface
+
+| Operation | Notes |
+| --- | --- |
+| `createPrivatePage` | Section: Personal or Teamspace. Returns permanent uuid path. |
+| `updatePrivatePage` | Autosave; MDX validated on write. |
+| `movePrivatePage` | Reparent within private tree or promote to public. |
+| `listPrivateTree` | Returns nodes the caller can read. |
+| `deletePage` | Idk it deletes stuff |
+
+## Risks
+
+- **ACL drift** between page records and folder inheritance. Mitigation: single source of truth in the permission service, nightly reconciler.
+- **MDX component parity** between public and promoted pages. Mitigation: shared renderer, contract tests on promotion.
+- **Cost** of per-org buckets at scale. Mitigation: shared bucket with prefix isolation, per-org quotas.
+
+## Rollout
+
+1. Internal dogfood (Mintlify team) behind a feature flag.
+2. Design partners on Growth and Enterprise plans.
+3. GA with Personal + Teamspace; Shared-with-me follows in the next release.
+
+## Open questions
+
+- Do we index private pages for org-wide search on day one, or gate behind an admin opt-in?
+- Does promotion to public require a review step, or is it a direct write to the repo?
